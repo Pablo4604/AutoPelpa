@@ -3,23 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vuelos Aerolíneas Argentinas - Córdoba (COR)</title>
+    <title>AutoPelpa</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
-            background-color: #f4f4f4;
+            background-color: #2c3e50; /* Azul oscuro */
+            color: #ecf0f1; /* Texto claro para contraste */
         }
         h1 {
             text-align: center;
-            color: #333;
+            color: #ecf0f1;
+        }
+        h2 {
+            text-align: center;
+            color: #bdc3c7;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            /* background-color: transparent; */ /* Fondo transparente para ver el azul oscuro */
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            color: #ecf0f1;
         }
         th, td {
             padding: 12px;
@@ -27,7 +34,7 @@
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #4CAF50;
+            background-color: #3498db; /* Azul metalizado */
             color: white;
         }
         tr:hover {
@@ -41,8 +48,7 @@
     </style>
 </head>
 <body>
-    <h1>Sistema Automático de Vuelos - Aerolíneas Argentinas</h1>
-    <h2>Aeropuerto de Córdoba (COR) - Próximas 24 Horas</h2>
+    <h1>AutoPelpa - Aerolíneas Argentinas</h1>
     
     {% if data %}
         <table>
