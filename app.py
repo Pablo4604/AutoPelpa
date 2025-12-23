@@ -8,14 +8,15 @@ app = Flask(__name__)
 
 def get_time_range():
     """
-    Siempre devuelve el rango de las próximas 24 horas en UTC
+    Siempre devuelve el rango de las próximas 24 horas en ART
     """
-    start_time = datetime.now(timezone.utc)
+    art_tz = timezone(timedelta(hours=-3))
+    start_time = datetime.now(art_tz)
     end_time = start_time + timedelta(hours=24)
     
-    print(f"🔍 Rango de búsqueda automático: Próximas 24 horas (UTC)")
-    print(f"   Desde: {start_time.strftime('%Y-%m-%d %H:%M')} UTC")
-    print(f"   Hasta: {end_time.strftime('%Y-%m-%d %H:%M')} UTC")
+    print(f"🔍 Rango de búsqueda automático: Próximas 24 horas (ART)")
+    print(f"   Desde: {start_time.strftime('%Y-%m-%d %H:%M')} ART")
+    print(f"   Hasta: {end_time.strftime('%Y-%m-%d %H:%M')} ART")
     
     return start_time, end_time
 
@@ -94,8 +95,9 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
                 origin = 'COR'
                 destination = flight.get('flight', {}).get('airport', {}).get('destination', {}).get('code', {}).get('iata', '')
             
-            # Convertir timestamp a formato HH:MM
-            time_dt = datetime.fromtimestamp(flight_time) if flight_time else None
+            # Convertir timestamp a formato HH:MM (en ART)
+            art_tz = timezone(timedelta(hours=-3))
+            time_dt = datetime.fromtimestamp(flight_time, tz=art_tz) if flight_time else None
             time_str = time_dt.strftime('%H:%M') if time_dt else ''
             
             flight_info = {
