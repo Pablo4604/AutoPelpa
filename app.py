@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from flask import Flask, render_template
 
@@ -8,14 +8,14 @@ app = Flask(__name__)
 
 def get_time_range():
     """
-    Siempre devuelve el rango de las próximas 24 horas
+    Siempre devuelve el rango de las próximas 24 horas en UTC
     """
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
     end_time = start_time + timedelta(hours=24)
     
-    print(f"🔍 Rango de búsqueda automático: Próximas 24 horas")
-    print(f"   Desde: {start_time.strftime('%Y-%m-%d %H:%M')}")
-    print(f"   Hasta: {end_time.strftime('%Y-%m-%d %H:%M')}")
+    print(f"🔍 Rango de búsqueda automático: Próximas 24 horas (UTC)")
+    print(f"   Desde: {start_time.strftime('%Y-%m-%d %H:%M')} UTC")
+    print(f"   Hasta: {end_time.strftime('%Y-%m-%d %H:%M')} UTC")
     
     return start_time, end_time
 
@@ -132,8 +132,8 @@ def combine_arrivals_departures(arrivals, departures):
                 combined_data.append({
                     'llegada': flight['numero_vuelo'],
                     'salida': '',
-                    'STA': flight['hora'],
-                    'ETA': '',
+                    'hora_llegada': flight['hora'],
+                    'hora_salida': '',
                     'origen': flight['aeropuerto'],
                     'destino': '',
                     'matricula': flight['matricula']
@@ -142,8 +142,8 @@ def combine_arrivals_departures(arrivals, departures):
                 combined_data.append({
                     'llegada': '',
                     'salida': flight['numero_vuelo'],
-                    'STA': '',
-                    'ETA': flight['hora'],
+                    'hora_llegada': '',
+                    'hora_salida': flight['hora'],
                     'origen': '',
                     'destino': flight['aeropuerto'],
                     'matricula': flight['matricula']
@@ -168,8 +168,8 @@ def combine_arrivals_departures(arrivals, departures):
             combined_data.append({
                 'llegada': arrival['numero_vuelo'],
                 'salida': matching_departure['numero_vuelo'],
-                'STA': arrival['hora'],
-                'ETA': matching_departure['hora'],
+                'hora_llegada': arrival['hora'],
+                'hora_salida': matching_departure['hora'],
                 'origen': arrival['aeropuerto'],
                 'destino': matching_departure['aeropuerto'],
                 'matricula': arrival['matricula']
@@ -181,8 +181,8 @@ def combine_arrivals_departures(arrivals, departures):
             combined_data.append({
                 'llegada': arrival['numero_vuelo'],
                 'salida': '',
-                'STA': arrival['hora'],
-                'ETA': '',
+                'hora_llegada': arrival['hora'],
+                'hora_salida': '',
                 'origen': arrival['aeropuerto'],
                 'destino': '',
                 'matricula': arrival['matricula']
@@ -196,8 +196,8 @@ def combine_arrivals_departures(arrivals, departures):
             combined_data.append({
                 'llegada': '',
                 'salida': departure['numero_vuelo'],
-                'STA': '',
-                'ETA': departure['hora'],
+                'hora_llegada': '',
+                'hora_salida': departure['hora'],
                 'origen': '',
                 'destino': departure['aeropuerto'],
                 'matricula': departure['matricula']
@@ -218,13 +218,13 @@ def export_to_excel(combined_data):
     df = pd.DataFrame(combined_data)
     
     # Ordenar por matrícula y luego por hora de llegada/salida
-    if 'STA' in df.columns and 'ETA' in df.columns:
-        df['orden_temporal'] = df['STA'].where(df['STA'] != '', df['ETA'])
+    if 'hora_llegada' in df.columns and 'hora_salida' in df.columns:
+        df['orden_temporal'] = df['hora_llegada'].where(df['hora_llegada'] != '', df['hora_salida'])
         df = df.sort_values('orden_temporal')
         df = df.drop('orden_temporal', axis=1)
     
     # Columnas en el orden correcto
-    column_order = ['llegada', 'salida', 'STA', 'ETA', 'origen', 'destino', 'matricula']
+    column_order = ['llegada', 'salida', 'hora_llegada', 'hora_salida', 'origen', 'destino', 'matricula']
     df = df[column_order]
     
     # Reemplazar NaN y None con celdas vacías
@@ -295,6 +295,13 @@ def main():
     if not combined_data:
         print("❌ No se pudieron combinar los datos")
         return []
+    
+    # Ordenar los datos combinados por tiempo (hora_llegada o hora_salida)
+    for item in combined_data:
+        item['orden_temporal'] = item['hora_llegada'] if item['hora_llegada'] else item['hora_salida']
+    combined_data.sort(key=lambda x: x['orden_temporal'])
+    for item in combined_data:
+        del item['orden_temporal']
     
     return combined_data
 
