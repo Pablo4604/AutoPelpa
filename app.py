@@ -260,8 +260,7 @@ def main():
     Retorna los datos combinados en lugar de exportar
     """
     print("=" * 60)
-    print("       SISTEMA AUTOMÁTICO DE VUELOS - AEROLÍNEAS AR")
-    print("           Aeropuerto de Córdoba (COR)")
+    print("       AUTOPELPA - ARSA COR")
     print("=" * 60)
     print()
     
