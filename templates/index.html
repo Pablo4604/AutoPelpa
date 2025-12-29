@@ -8,10 +8,13 @@
     <link rel="icon" href="/static/favicon.png" type="image/png">
     <style>
         body {
+            background: linear-gradient(
+                to bottom,
+                #81acd6,
+                #021224
+            );
+            color: white;
             font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #2c3e50; /* Azul oscuro */
-            color: #ecf0f1; /* Texto claro para contraste */
         }
         h1 {
             text-align: center;
@@ -35,9 +38,18 @@
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #3498db; /* Azul metalizado */
-            color: white;
+            color: #ffffff;
+            font-weight: bold;
+            text-transform: uppercase;
         }
+        thead {
+            background: linear-gradient(
+                to left,
+                #7e7d7d,
+                #2a2a2a
+            );
+        }
+
         .no-data {
             text-align: center;
             color: #666;
@@ -55,7 +67,7 @@
             text-decoration: none;
         }
         .site-logo {
-            max-height: 110px;
+            max-height: 80px;
             width: auto;
         }
         .brand-text {
