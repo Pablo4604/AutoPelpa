@@ -125,7 +125,7 @@ def combine_arrivals_departures(arrivals, departures):
     processed_matriculas = set()
     
     # Excepciones - vuelos que deben permanecer separados
-    exception_vuelos = {'AR1550', 'AR1587', 'AR1552', 'AR1551', 'AR1553'}
+    exception_vuelos = {'AR1550', 'AR1551', 'AR1586', 'AR1587', 'AR1552', 'AR1553'}
     
     # Primero procesar las excepciones
     for flight in arrivals + departures:
@@ -138,7 +138,8 @@ def combine_arrivals_departures(arrivals, departures):
                     'hora_salida': '',
                     'origen': flight['aeropuerto'],
                     'destino': '',
-                    'matricula': flight['matricula']
+                    'matricula': flight['matricula'],
+                    'ts_orden': flight['timestamp']
                 })
             else:
                 combined_data.append({
@@ -148,7 +149,8 @@ def combine_arrivals_departures(arrivals, departures):
                     'hora_salida': flight['hora'],
                     'origen': '',
                     'destino': flight['aeropuerto'],
-                    'matricula': flight['matricula']
+                    'matricula': flight['matricula'],
+                    'ts_orden': flight['timestamp']
                 })
             processed_matriculas.add(flight['matricula'])
     
@@ -174,7 +176,8 @@ def combine_arrivals_departures(arrivals, departures):
                 'hora_salida': matching_departure['hora'],
                 'origen': arrival['aeropuerto'],
                 'destino': matching_departure['aeropuerto'],
-                'matricula': arrival['matricula']
+                'matricula': arrival['matricula'],
+                'ts_orden': min(arrival['timestamp'], matching_departure['timestamp'])
             })
             processed_matriculas.add(arrival['matricula'])
             processed_matriculas.add(matching_departure['matricula'])
@@ -187,7 +190,8 @@ def combine_arrivals_departures(arrivals, departures):
                 'hora_salida': '',
                 'origen': arrival['aeropuerto'],
                 'destino': '',
-                'matricula': arrival['matricula']
+                'matricula': arrival['matricula'],
+                'ts_orden': arrival['timestamp']
             })
             processed_matriculas.add(arrival['matricula'])
     
@@ -202,7 +206,8 @@ def combine_arrivals_departures(arrivals, departures):
                 'hora_salida': departure['hora'],
                 'origen': '',
                 'destino': departure['aeropuerto'],
-                'matricula': departure['matricula']
+                'matricula': departure['matricula'],
+                'ts_orden': departure['timestamp']
             })
             processed_matriculas.add(departure['matricula'])
     
@@ -218,12 +223,6 @@ def export_to_excel(combined_data):
     
     # Crear DataFrame
     df = pd.DataFrame(combined_data)
-    
-    # Ordenar por matrícula y luego por hora de llegada/salida
-    if 'hora_llegada' in df.columns and 'hora_salida' in df.columns:
-        df['orden_temporal'] = df['hora_llegada'].where(df['hora_llegada'] != '', df['hora_salida'])
-        df = df.sort_values('orden_temporal')
-        df = df.drop('orden_temporal', axis=1)
     
     # Columnas en el orden correcto
     column_order = ['llegada', 'salida', 'hora_llegada', 'hora_salida', 'origen', 'destino', 'matricula']
@@ -297,13 +296,13 @@ def main():
         print("❌ No se pudieron combinar los datos")
         return []
     
-    # Ordenar los datos combinados por tiempo (hora_llegada o hora_salida)
-    for item in combined_data:
-        item['orden_temporal'] = item['hora_llegada'] if item['hora_llegada'] else item['hora_salida']
-    combined_data.sort(key=lambda x: x['orden_temporal'])
-    for item in combined_data:
-        del item['orden_temporal']
+    combined_data = combine_arrivals_departures(arrivals_processed, departures_processed)
+
+    combined_data = sorted(combined_data, key=lambda x: x['ts_orden'])
     
+    for item in combined_data:
+        del item['ts_orden']
+
     return combined_data
 
 @app.route('/')
