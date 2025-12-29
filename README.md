@@ -7,8 +7,7 @@ Taravella (COR)**.
 
 La aplicación está diseñada para funcionar como un **tablero operativo**
 simple, con renderizado **100% backend** y un **template HTML
-estrictamente estático**, cumpliendo con las políticas de despliegue de
-**Render**.
+estrictamente estático**, despliegue en **Render**.
 
 ------------------------------------------------------------------------
 
@@ -43,7 +42,7 @@ la vista.
 
 ### Template estrictamente estático
 
-Por políticas de Render y por decisión arquitectónica:
+Por decisión arquitectónica:
 
 -   No se utiliza JavaScript dinámico
 -   No hay fetch, AJAX, SSE ni WebSockets
