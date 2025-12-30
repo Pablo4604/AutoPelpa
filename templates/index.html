@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="description" content="Tablero actualizado de vuelos de llegada y salida de Aerolíneas Argentinas en el Aeropuerto de Córdoba (COR). Información operativa ordenada cronológicamente.">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AutoPelpa - Vuelos Aerolíneas Argentinas - COR</title>
     <link rel="icon" href="/static/favicon.png" type="image/png">
     <style>
@@ -13,6 +13,9 @@
                 #81acd6,
                 #021224
             );
+            background-attachment: fixed;
+            margin: 0;
+            padding: 10px;
             color: white;
             font-family: Arial, sans-serif;
         }
@@ -26,15 +29,18 @@
         }
         table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 15px 0;
             /* background-color: transparent; */ /* Fondo transparente para ver el azul oscuro */
             box-shadow: 0 0 10px rgba(0,0,0,0.3);
             color: #ecf0f1;
         }
         th, td {
-            padding: 12px;
-            text-align: left;
+            padding: 8px 2px;
+            font-size: 0.85rem;
+            text-align: center;
+            word-wrap: break-word;
             border-bottom: 1px solid #ddd;
         }
         th {
@@ -76,6 +82,14 @@
             color: #ecf0f1;
             font-family: Arial, sans-serif;
         }
+        @media (max-width: 480px) {
+            th, td {
+                font-size: 0.62rem;
+            }
+            .brand-text {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -96,8 +110,8 @@
         <table>
             <thead>
                 <tr>
-                    <th scope="col">LLEGADA</th>
-                    <th scope="col">SALIDA</th>
+                    <th scope="col">LLEGA</th>
+                    <th scope="col">SALE</th>
                     <th scope="col">ETA</th>
                     <th scope="col">ETD</th>
                     <th scope="col">ORIGEN</th>
@@ -123,8 +137,8 @@
         <p class="no-data">No se encontraron vuelos de Aerolíneas Argentinas en el rango de 24 horas.</p>
     {% endif %}
     <p>
-    Reemplazo en formato digital de programaciones de vuelos de llegada y salida de Aerolíneas Argentinas en el Aeropuerto Internacional Ingeniero Ambrosio Taravella (COR), ordenados cronológicamente para una mejor visualización operativa.
+    Reemplazo en formato digital de programaciones de vuelos de llegada y salida de Aerolíneas Argentinas en el Aeropuerto Internacional Ingeniero Ambrosio Taravella (COR), ordenados cronológicamente para una mejor visualización operativa.<br>
+    Desarrollado por PABLO PERALTA.
     </p>
-
 </body>
 </html>

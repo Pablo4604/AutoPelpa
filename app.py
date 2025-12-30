@@ -74,6 +74,9 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
             
             # Matrícula
             registration = flight.get('flight', {}).get('aircraft', {}).get('registration', '')
+
+            if registration.startswith('LV-'):
+                registration = registration.replace('LV-', '')
             
             # Tiempos - usar estimated o scheduled como fallback
             time_data = flight.get('flight', {}).get('time', {})
