@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-import time
+
 from flask import Flask, render_template, Response
 
 app = Flask(__name__)
@@ -10,8 +10,7 @@ def get_time_range():
     """
     Siempre devuelve el rango de las próximas 24 horas en ART
     """
-    art_tz = timezone(timedelta(hours=-3))
-    start_time = datetime.now(art_tz)
+    start_time = datetime.now()
     end_time = start_time + timedelta(hours=24)
     
     print(f"🔍 Rango de búsqueda automático: Próximas 24 horas (ART)")
@@ -38,6 +37,13 @@ def get_flight_data_from_fr24(url, flight_type):
         if response.status_code == 200:
             data = response.json()
             flights = data.get('result', {}).get('response', {}).get('airport', {}).get('pluginData', {}).get('schedule', {}).get(flight_type, {}).get('data', [])
+            # Si no hay vuelos, mostrar información mínima para depuración
+            if not flights:
+                try:
+                    top_keys = list(data.keys()) if isinstance(data, dict) else []
+                except Exception:
+                    top_keys = []
+                print(f"⚠️ Atención: No se encontraron '{flight_type}' en la respuesta. Keys top-level: {top_keys}")
             print(f"✅ {len(flights)} {flight_type} obtenidos")
             return flights
         else:
@@ -53,35 +59,53 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
     Procesa los datos de vuelos y filtra por Aerolíneas Argentinas y rango horario
     """
     processed_data = []
-    
+
+    def _normalize_ts(ts):
+        try:
+            if not ts:
+                return 0
+            ts_int = int(ts)
+            # Algunos endpoints devuelven milisegundos
+            if ts_int > 10**11:
+                return int(ts_int / 1000)
+            return ts_int
+        except Exception:
+            return 0
+
     for flight in flights:
         try:
+            if not flight:
+                #Ocurre que algunos elementos pueden ser None; se ignoran
+                continue
             # Información de la aerolínea
-            airline = flight.get('flight', {}).get('airline', {})
-            airline_code = airline.get('code', {}).get('iata', '')
+            flight_root = flight.get('flight') or {}
+            airline = flight_root.get('airline') or {}
+            airline_code = (airline.get('code') or {}).get('iata', '')
             
             # Solo procesar vuelos de Aerolíneas Argentinas (AR)
             if airline_code != 'AR':
                 continue
             
             # Número de vuelo (corregido para evitar duplicación ARAR)
-            flight_number_data = flight.get('flight', {}).get('identification', {}).get('number', {})
+            flight_number_data = (flight_root.get('identification') or {}).get('number', {})
             flight_number = flight_number_data.get('default', '') or flight_number_data.get('number', '')
             
             # Remover "AR" duplicado si existe
-            if flight_number.startswith('AR'):
+            if isinstance(flight_number, str) and flight_number.startswith('AR'):
                 flight_number = flight_number[2:]
             
             # Matrícula
-            registration = flight.get('flight', {}).get('aircraft', {}).get('registration', '')
+            registration = (flight_root.get('aircraft') or {}).get('registration', '')
 
-            if registration.startswith('LV-'):
-                registration = registration.replace('LV-', '')
             
             # Tiempos - usar estimated o scheduled como fallback
-            time_data = flight.get('flight', {}).get('time', {})
-            scheduled_time = time_data.get('scheduled', {}).get(f"{'arrival' if flight_type == 'arrivals' else 'departure'}", 0)
-            estimated_time = time_data.get('estimated', {}).get(f"{'arrival' if flight_type == 'arrivals' else 'departure'}", 0)
+            time_data = flight_root.get('time', {})
+            scheduled_time = time_data.get('scheduled', {}).get('arrival' if flight_type == 'arrivals' else 'departure', 0) if isinstance(time_data.get('scheduled', {}), dict) else time_data.get('scheduled', 0)
+            estimated_time = time_data.get('estimated', {}).get('arrival' if flight_type == 'arrivals' else 'departure', 0) if isinstance(time_data.get('estimated', {}), dict) else time_data.get('estimated', 0)
+
+            # Normalizar unidades (ms -> s) y asegurar enteros
+            scheduled_time = _normalize_ts(scheduled_time)
+            estimated_time = _normalize_ts(estimated_time)
             
             # Usar estimated si está disponible, sino scheduled
             flight_time = estimated_time if estimated_time else scheduled_time
@@ -91,31 +115,37 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
                 continue
             
             # Aeropuertos
+            airport_root = flight_root.get('airport') or {}
             if flight_type == 'arrivals':
-                origin = flight.get('flight', {}).get('airport', {}).get('origin', {}).get('code', {}).get('iata', '')
+                origin = airport_root.get('origin', {}).get('code', {}).get('iata', '')
                 destination = 'COR'
             else:
                 origin = 'COR'
-                destination = flight.get('flight', {}).get('airport', {}).get('destination', {}).get('code', {}).get('iata', '')
+                destination = ((airport_root.get('destination') or {}).get('code') or {}).get('iata', '')
             
             # Convertir timestamp a formato HH:MM (en ART)
-            art_tz = timezone(timedelta(hours=-3))
-            time_dt = datetime.fromtimestamp(flight_time, tz=art_tz) if flight_time else None
+            time_dt = datetime.fromtimestamp(flight_time) if flight_time else None
             time_str = time_dt.strftime('%H:%M') if time_dt else ''
             
+            # Si no hay matricula, dejar la celda vacía (no usar nro de vuelo como fallback)
+            matricula_val = registration if registration else ''
+
             flight_info = {
                 'tipo': 'Llegada' if flight_type == 'arrivals' else 'Salida',
                 'numero_vuelo': f"AR{flight_number}",
                 'hora': time_str,
                 'aeropuerto': origin if flight_type == 'arrivals' else destination,
-                'matricula': registration,
+                'matricula': matricula_val,
                 'timestamp': flight_time
             }
             
             processed_data.append(flight_info)
             
         except Exception as e:
-            print(f"Error procesando vuelo: {e}")
+            try:
+                print(f"❌ Error al procesar vuelo: {e} - elemento: {repr(flight)[:200]}")
+            except Exception:
+                print(f"❌ Error procesando vuelo: {e} - elemento: <unrepresentable>")
             continue
     
     return processed_data
@@ -155,7 +185,8 @@ def combine_arrivals_departures(arrivals, departures):
                     'matricula': flight['matricula'],
                     'ts_orden': flight['timestamp']
                 })
-            processed_matriculas.add(flight['matricula'])
+            if flight['matricula']:
+                processed_matriculas.add(flight['matricula'])
     
     # Combinar llegadas y salidas normales por matrícula
     for arrival in arrivals:
@@ -165,6 +196,9 @@ def combine_arrivals_departures(arrivals, departures):
         # Buscar salida correspondiente
         matching_departure = None
         for departure in departures:
+            # No emparejar por matrícula vacía
+            if not arrival['matricula'] or not departure['matricula']:
+                continue
             if (departure['matricula'] == arrival['matricula'] and 
                 departure['matricula'] not in processed_matriculas and
                 departure['numero_vuelo'] not in exception_vuelos):
@@ -182,8 +216,10 @@ def combine_arrivals_departures(arrivals, departures):
                 'matricula': arrival['matricula'],
                 'ts_orden': min(arrival['timestamp'], matching_departure['timestamp'])
             })
-            processed_matriculas.add(arrival['matricula'])
-            processed_matriculas.add(matching_departure['matricula'])
+            if arrival['matricula']:
+                processed_matriculas.add(arrival['matricula'])
+            if matching_departure['matricula']:
+                processed_matriculas.add(matching_departure['matricula'])
         else:
             # Solo llegada
             combined_data.append({
@@ -196,12 +232,13 @@ def combine_arrivals_departures(arrivals, departures):
                 'matricula': arrival['matricula'],
                 'ts_orden': arrival['timestamp']
             })
-            processed_matriculas.add(arrival['matricula'])
+            if arrival['matricula']:
+                processed_matriculas.add(arrival['matricula'])
     
     # Agregar salidas sin llegada correspondiente
     for departure in departures:
-        if (departure['matricula'] not in processed_matriculas and 
-            departure['numero_vuelo'] not in exception_vuelos):
+        if (departure['numero_vuelo'] not in exception_vuelos and
+            (not departure['matricula'] or departure['matricula'] not in processed_matriculas)):
             combined_data.append({
                 'llegada': '',
                 'salida': departure['numero_vuelo'],
@@ -212,7 +249,8 @@ def combine_arrivals_departures(arrivals, departures):
                 'matricula': departure['matricula'],
                 'ts_orden': departure['timestamp']
             })
-            processed_matriculas.add(departure['matricula'])
+            if departure['matricula']:
+                processed_matriculas.add(departure['matricula'])
     
     return combined_data
 
