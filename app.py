@@ -1,16 +1,19 @@
 import requests
 import pandas as pd
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import Flask, render_template, Response
 
 app = Flask(__name__)
 
+ART = ZoneInfo("America/Argentina/Cordoba")
+
 def get_time_range():
     """
-    Siempre devuelve el rango de las próximas 24 horas en ART
+    Siempre devuelve el rango de las próximas 24 horas en ART real (UTC-3)
     """
-    start_time = datetime.now()
+    start_time = datetime.now(ART)
     end_time = start_time + timedelta(hours=24)
     
     print(f"🔍 Rango de búsqueda automático: Próximas 24 horas (ART)")
@@ -59,6 +62,9 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
     Procesa los datos de vuelos y filtra por Aerolíneas Argentinas y rango horario
     """
     processed_data = []
+    total_raw = len(flights)
+    total_ar = 0
+    total_fuera_de_rango = 0
 
     def _normalize_ts(ts):
         try:
@@ -85,6 +91,7 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
             # Solo procesar vuelos de Aerolíneas Argentinas (AR)
             if airline_code != 'AR':
                 continue
+            total_ar += 1
             
             # Número de vuelo (corregido para evitar duplicación ARAR)
             flight_number_data = (flight_root.get('identification') or {}).get('number', {})
@@ -112,6 +119,7 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
             
             # Filtrar por rango de tiempo
             if not (start_timestamp <= flight_time <= end_timestamp):
+                total_fuera_de_rango += 1
                 continue
             
             # Aeropuertos
@@ -123,8 +131,8 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
                 origin = 'COR'
                 destination = ((airport_root.get('destination') or {}).get('code') or {}).get('iata', '')
             
-            # Convertir timestamp a formato HH:MM (en ART)
-            time_dt = datetime.fromtimestamp(flight_time) if flight_time else None
+            # Convertir timestamp (epoch UTC) a formato HH:MM en ART real
+            time_dt = datetime.fromtimestamp(flight_time, tz=ART) if flight_time else None
             time_str = time_dt.strftime('%H:%M') if time_dt else ''
             
             # Si no hay matricula, dejar la celda vacía (no usar nro de vuelo como fallback)
@@ -147,7 +155,10 @@ def process_flight_data(flights, flight_type, start_timestamp, end_timestamp):
             except Exception:
                 print(f"❌ Error procesando vuelo: {e} - elemento: <unrepresentable>")
             continue
-    
+
+    print(f"   🔎 [{flight_type}] recibidos de FR24: {total_raw} | de Aerolíneas Argentinas: {total_ar} | "
+          f"descartados por rango horario: {total_fuera_de_rango} | en tabla final: {len(processed_data)}")
+
     return processed_data
 
 def combine_arrivals_departures(arrivals, departures):
@@ -193,15 +204,17 @@ def combine_arrivals_departures(arrivals, departures):
         if arrival['matricula'] in processed_matriculas or arrival['numero_vuelo'] in exception_vuelos:
             continue
         
-        # Buscar salida correspondiente
+        # Buscar salida correspondiente: misma matrícula y posterior en el tiempo
+        # (evita emparejar con una salida de un tramo distinto que ya había pasado)
         matching_departure = None
-        for departure in departures:
+        for departure in sorted(departures, key=lambda d: d['timestamp']):
             # No emparejar por matrícula vacía
             if not arrival['matricula'] or not departure['matricula']:
                 continue
             if (departure['matricula'] == arrival['matricula'] and 
                 departure['matricula'] not in processed_matriculas and
-                departure['numero_vuelo'] not in exception_vuelos):
+                departure['numero_vuelo'] not in exception_vuelos and
+                departure['timestamp'] > arrival['timestamp']):
                 matching_departure = departure
                 break
         
@@ -336,8 +349,6 @@ def main():
     if not combined_data:
         print("❌ No se pudieron combinar los datos")
         return []
-    
-    combined_data = combine_arrivals_departures(arrivals_processed, departures_processed)
 
     combined_data = sorted(combined_data, key=lambda x: x['ts_orden'])
     
